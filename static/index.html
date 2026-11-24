@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tpad ENR tiles</title>
+<style>body{font:15px system-ui,sans-serif;max-width:640px;margin:32px auto;padding:0 16px;line-height:1.6}code{background:#eee;padding:1px 4px;border-radius:4px}</style></head>
+<body><h1>Tpad ENR chart tiles</h1>
+<p>แผ่นภาพ Enroute Chart (ICAO) ของ AIP ประเทศไทย สำหรับชั้นแผนที่ "ENR Chart" ใน Tpad Helicopter Planner</p>
+<p id="m">กำลังอ่านข้อมูล…</p>
+<p><b>ใช้ประกอบการวางแผนเท่านั้น</b> ไม่ใช่ชาร์ตทางการ ต้องตรวจกับ AIP ฉบับที่มีผลทุกครั้ง</p>
+<script>fetch("meta.json").then(r=>r.json()).then(m=>{document.getElementById("m").textContent="AIRAC "+m.airac+" · มีผล "+m.effective+" · ซูม "+m.zmin+"–"+m.zmax+" · "+m.tiles+" แผ่น · สร้างเมื่อ "+m.built}).catch(()=>{document.getElementById("m").textContent="ยังไม่มีข้อมูล"})</script>
+<p>รูปแบบ URL: <code>tiles/{z}/{x}/{y}.png</code> (XYZ, พื้นโปร่งใส)</p></body></html>

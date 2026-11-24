@@ -1,0 +1,58 @@
+# สร้างแผ่นภาพ Enroute Chart (ENR) จาก PDF แล้วเผยแพร่ขึ้น GitHub Pages
+# ทำงานเองเมื่อมีการอัปโหลด/แก้ไฟล์ PDF ในโฟลเดอร์ enr/  หรือกดเองที่แท็บ Actions → "Build ENR tiles" → Run workflow
+# (ต้องตั้ง Settings → Pages → Source = GitHub Actions ไว้ก่อน)
+name: Build ENR tiles
+on:
+  push:
+    paths: ["enr/*.pdf", "build_enr.py", "static/**", ".github/workflows/build.yml"]
+  workflow_dispatch:
+    inputs:
+      zmax:
+        description: "ซูมสูงสุดที่สร้าง (11 = คมพอสำหรับชาร์ตทั้งแผ่น)"
+        default: "11"
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: ติดตั้งเครื่องมือ
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gdal-bin python3-gdal python3-numpy python3-pil python3-pip
+          sudo pip3 install --break-system-packages -q pymupdf
+      - name: เลือกไฟล์ PDF (ต้องมีไฟล์เดียวในโฟลเดอร์ enr/)
+        id: pdf
+        run: |
+          n=$(ls enr/*.pdf 2>/dev/null | wc -l)
+          if [ "$n" -ne 1 ]; then echo "::error::โฟลเดอร์ enr/ ต้องมี PDF ไฟล์เดียว (พบ $n ไฟล์) — ลบฉบับเก่าออกก่อน"; exit 1; fi
+          echo "f=$(ls enr/*.pdf)" >> "$GITHUB_OUTPUT"
+      - name: จัดพิกัด + ตัดแผ่นภาพ
+        run: /usr/bin/python3 build_enr.py --pdf "${{ steps.pdf.outputs.f }}" --out site --zmax "${{ inputs.zmax || '11' }}" --gdal2tiles "/usr/bin/python3 /usr/bin/gdal2tiles.py" 2>&1 | grep -v "^Syntax Error" | tee build.log
+      - name: ตรวจผลและขนาด (GitHub Pages ไม่เกิน 1 GB)
+        run: |
+          test -f site/meta.json || { echo "::error::สร้างไม่สำเร็จ ดูรายละเอียดใน log"; exit 1; }
+          cp -r static/. site/
+          MB=$(du -sm site | cut -f1)
+          { echo "## ผลการสร้าง"; echo; echo '```'; grep -E "จุดอ้างอิง|คลาดเคลื่อน|AIRAC|เสร็จ" build.log; echo '```'; echo "ขนาดหน้าเว็บรวม: ${MB} MB"; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$MB" -gt 950 ]; then echo "::error::ขนาด ${MB} MB เกินเพดาน ให้รันใหม่โดยลด zmax"; exit 1; fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4
